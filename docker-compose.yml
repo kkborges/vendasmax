@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: vendasmax-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: vendasmax
+      POSTGRES_PASSWORD: vendasmax123
+      POSTGRES_DB: vendasmax
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vendasmax"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: vendasmax-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (descomentar após configuração)
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: vendasmax-backend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3001:3001"
+  #   environment:
+  #     NODE_ENV: production
+  #     DATABASE_URL: postgresql://vendasmax:vendasmax123@postgres:5432/vendasmax
+  #     REDIS_URL: redis://redis:6379
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./backend:/app
+  #     - /app/node_modules
+
+  # Admin Web (descomentar após configuração)
+  # admin-web:
+  #   build:
+  #     context: ./admin-web
+  #     dockerfile: Dockerfile
+  #   container_name: vendasmax-admin
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3000:80"
+  #   depends_on:
+  #     - backend
+
+  # Client App (descomentar após configuração)
+  # client-app:
+  #   build:
+  #     context: ./client-app
+  #     dockerfile: Dockerfile
+  #   container_name: vendasmax-client
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3002:80"
+  #   depends_on:
+  #     - backend
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: vendasmax-network

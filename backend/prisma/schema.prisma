@@ -1,0 +1,411 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Usuário (para autenticação admin)
+model Usuario {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  senha     String
+  nome      String
+  role      Role     @default(OPERADOR)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+enum Role {
+  ADMIN
+  OPERADOR
+  VENDEDOR
+}
+
+// Modelo de Condomínio
+model Condominio {
+  id               String      @id @default(uuid())
+  cnpj             String      @unique
+  nome             String
+  rua              String
+  cep              String
+  bairro           String
+  cidade           String
+  estado           String
+  totalBlocos      Int
+  totalApartamentos Int
+  ativo            Boolean     @default(true)
+  contratoRescindido Boolean   @default(false)
+  usuario          String?     // Usuário para login no app de vendas
+  senha            String?     // Senha para login no app de vendas
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  containers       Container[]
+  notificacoes     Notificacao[]
+
+  @@map("condominios")
+}
+
+// Modelo de Container
+model Container {
+  id           String      @id @default(uuid())
+  condominioId String
+  bloco        String?
+  espaco       String?
+  localizacao  String
+  ativo        Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  condominio   Condominio  @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  estoque      ContainerEstoque[]
+  vendas       Venda[]
+  statusServicos StatusServico[]
+
+  @@map("containers")
+  @@index([condominioId])
+}
+
+// Modelo de Categoria
+model Categoria {
+  id        String    @id @default(uuid())
+  nome      String    @unique
+  descricao String?
+  ativo     Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  produtos  Produto[]
+
+  @@map("categorias")
+}
+
+// Modelo de Produto
+model Produto {
+  id              String    @id @default(uuid())
+  categoriaId     String
+  nome            String
+  descricao       String?
+  codigoBarras    String?   @unique
+  qrCode          String?   @unique
+  foto            String?
+  estoqueMinimo   Int       @default(10)
+  valorCompra     Decimal   @db.Decimal(10, 2)
+  valorVenda      Decimal   @db.Decimal(10, 2)
+  unidade         String    @default("UN") // UN, KG, L, etc
+  ativo           Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  categoria       Categoria @relation(fields: [categoriaId], references: [id])
+  estoqueGeral    EstoqueGeral?
+  estoqueContainers ContainerEstoque[]
+  vendaItens      VendaItem[]
+  historicoMovimentacao MovimentacaoEstoque[]
+
+  @@map("produtos")
+  @@index([categoriaId])
+  @@index([codigoBarras])
+  @@index([qrCode])
+}
+
+// Estoque Geral (central)
+model EstoqueGeral {
+  id         String   @id @default(uuid())
+  produtoId  String   @unique
+  quantidade Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  produto    Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  @@map("estoque_geral")
+}
+
+// Estoque por Container
+model ContainerEstoque {
+  id           String    @id @default(uuid())
+  containerId  String
+  produtoId    String
+  quantidade   Int       @default(0)
+  dataValidade DateTime?
+  lote         String?
+  updatedAt    DateTime  @updatedAt
+
+  container    Container @relation(fields: [containerId], references: [id], onDelete: Cascade)
+  produto      Produto   @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  @@unique([containerId, produtoId, lote])
+  @@map("container_estoque")
+  @@index([containerId])
+  @@index([produtoId])
+  @@index([dataValidade])
+}
+
+// Movimentação de Estoque (histórico)
+model MovimentacaoEstoque {
+  id          String            @id @default(uuid())
+  produtoId   String
+  tipo        TipoMovimentacao
+  quantidade  Int
+  origem      String?           // Container origem ou "GERAL"
+  destino     String?           // Container destino ou "GERAL"
+  observacao  String?
+  usuarioId   String?
+  createdAt   DateTime          @default(now())
+
+  produto     Produto           @relation(fields: [produtoId], references: [id])
+
+  @@map("movimentacao_estoque")
+  @@index([produtoId])
+  @@index([createdAt])
+}
+
+enum TipoMovimentacao {
+  ENTRADA        // Compra de produtos
+  SAIDA          // Venda de produtos
+  TRANSFERENCIA  // Transferência entre containers
+  AJUSTE         // Ajuste manual
+  PERDA          // Produto vencido/danificado
+}
+
+// Modelo de Venda
+model Venda {
+  id              String        @id @default(uuid())
+  containerId     String
+  numeroVenda     String        @unique
+  valorTotal      Decimal       @db.Decimal(10, 2)
+  status          StatusVenda   @default(PENDENTE)
+  modoOffline     Boolean       @default(false)
+  sincronizada    Boolean       @default(true)
+  clienteNome     String?
+  clienteBloco    String?
+  clienteApto     String?
+  clienteContato  String?
+  observacao      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  container       Container     @relation(fields: [containerId], references: [id])
+  itens           VendaItem[]
+  pagamentos      Pagamento[]
+  logs            LogVenda[]
+
+  @@map("vendas")
+  @@index([containerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum StatusVenda {
+  PENDENTE
+  PAGO
+  CANCELADO
+  PARCIAL
+}
+
+// Itens da Venda
+model VendaItem {
+  id            String  @id @default(uuid())
+  vendaId       String
+  produtoId     String
+  quantidade    Int
+  valorUnitario Decimal @db.Decimal(10, 2)
+  valorTotal    Decimal @db.Decimal(10, 2)
+  desconto      Decimal @default(0) @db.Decimal(10, 2)
+
+  venda         Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  produto       Produto @relation(fields: [produtoId], references: [id])
+
+  @@map("venda_itens")
+  @@index([vendaId])
+  @@index([produtoId])
+}
+
+// Modelo de Pagamento
+model Pagamento {
+  id                String          @id @default(uuid())
+  vendaId           String
+  metodoPagamento   MetodoPagamento
+  gateway           Gateway?
+  valorPago         Decimal         @db.Decimal(10, 2)
+  status            StatusPagamento @default(PENDENTE)
+  tentativas        Int             @default(0)
+  transactionId     String?
+  pixQrCode         String?
+  pixQrCodeUrl      String?
+  maquininha        String?         // Identificação da maquininha
+  erroMensagem      String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  venda             Venda           @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  historico         PagamentoHistorico[]
+
+  @@map("pagamentos")
+  @@index([vendaId])
+  @@index([status])
+  @@index([transactionId])
+}
+
+enum MetodoPagamento {
+  PIX
+  CREDITO
+  DEBITO
+  DINHEIRO
+}
+
+enum Gateway {
+  STRIPE
+  MERCADOPAGO
+  MAQUININHA
+}
+
+enum StatusPagamento {
+  PENDENTE
+  PROCESSANDO
+  APROVADO
+  RECUSADO
+  ERRO
+  CANCELADO
+}
+
+// Histórico de tentativas de pagamento
+model PagamentoHistorico {
+  id           String   @id @default(uuid())
+  pagamentoId  String
+  tentativa    Int
+  status       String
+  mensagem     String?
+  erro         String?
+  createdAt    DateTime @default(now())
+
+  pagamento    Pagamento @relation(fields: [pagamentoId], references: [id], onDelete: Cascade)
+
+  @@map("pagamento_historico")
+  @@index([pagamentoId])
+}
+
+// Log de Vendas (para auditoria)
+model LogVenda {
+  id        String   @id @default(uuid())
+  vendaId   String
+  tipo      String
+  mensagem  String
+  dados     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  venda     Venda    @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+
+  @@map("log_vendas")
+  @@index([vendaId])
+  @@index([createdAt])
+}
+
+// Notificações
+model Notificacao {
+  id           String          @id @default(uuid())
+  condominioId String?
+  tipo         TipoNotificacao
+  titulo       String
+  mensagem     String
+  email        String?
+  telefone     String?
+  whatsapp     String?
+  enviada      Boolean         @default(false)
+  lida         Boolean         @default(false)
+  erro         String?
+  createdAt    DateTime        @default(now())
+  enviadaEm    DateTime?
+
+  condominio   Condominio?     @relation(fields: [condominioId], references: [id])
+
+  @@map("notificacoes")
+  @@index([condominioId])
+  @@index([enviada])
+  @@index([createdAt])
+}
+
+enum TipoNotificacao {
+  ESTOQUE_MINIMO
+  PRODUTO_VENCENDO
+  PAGAMENTO_PENDENTE
+  SERVICO_OFFLINE
+  ERRO_SISTEMA
+}
+
+// Status de Serviços (monitoramento)
+model StatusServico {
+  id          String         @id @default(uuid())
+  containerId String?
+  servico     TipoServico
+  status      StatusConexao  @default(ONLINE)
+  mensagem    String?
+  ultimaChecagem DateTime    @default(now())
+
+  container   Container?     @relation(fields: [containerId], references: [id])
+
+  @@map("status_servicos")
+  @@index([containerId])
+  @@index([servico])
+  @@index([status])
+}
+
+enum TipoServico {
+  STRIPE
+  MERCADOPAGO
+  MAQUININHA
+  BACKEND
+  DATABASE
+  REDIS
+}
+
+enum StatusConexao {
+  ONLINE
+  OFFLINE
+  ERRO
+  DESCONHECIDO
+}
+
+// Análise de Vendas (para ML)
+model AnaliseVenda {
+  id               String   @id @default(uuid())
+  containerId      String
+  produtoId        String
+  periodo          String   // YYYY-MM-DD
+  quantidadeVendida Int
+  valorTotal       Decimal  @db.Decimal(10, 2)
+  diaSemana        Int      // 0-6
+  createdAt        DateTime @default(now())
+
+  @@unique([containerId, produtoId, periodo])
+  @@map("analise_vendas")
+  @@index([containerId])
+  @@index([produtoId])
+  @@index([periodo])
+}
+
+// Sugestões de Compra (ML)
+model SugestaoCompra {
+  id                  String   @id @default(uuid())
+  containerId         String
+  produtoId           String
+  quantidadeSugerida  Int
+  confianca           Decimal  @db.Decimal(5, 2) // Percentual de confiança
+  baseadoEmDias       Int      // Quantidade de dias analisados
+  observacao          String?
+  createdAt           DateTime @default(now())
+
+  @@map("sugestoes_compra")
+  @@index([containerId])
+  @@index([produtoId])
+  @@index([createdAt])
+}
