@@ -219,7 +219,7 @@ export const deletarCondominio = async (req: Request, res: Response) => {
   }
 };
 
-export const rescindir Contrato = async (req: Request, res: Response) => {
+export const rescindirContrato = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
