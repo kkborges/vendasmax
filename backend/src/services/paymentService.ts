@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import mercadopago from 'mercadopago';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import prisma from '../config/database';
 import logger from '../config/logger';
 import { AppError } from '../middleware/errorHandler';
@@ -10,9 +10,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 });
 
 // Configurar Mercado Pago
-mercadopago.configure({
-  access_token: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
+const mercadopagoClient = new MercadoPagoConfig({
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
 });
+const mercadopagoPayment = new Payment(mercadopagoClient);
 
 export interface PaymentData {
   vendaId: string;
@@ -217,48 +218,52 @@ const processarPagamentoMercadoPago = async (
   try {
     if (dados.metodoPagamento === 'PIX') {
       // Criar pagamento PIX
-      const payment = await mercadopago.payment.create({
-        transaction_amount: dados.valorPago,
-        description: `Venda ${dados.vendaId}`,
-        payment_method_id: 'pix',
-        payer: {
-          email: 'cliente@email.com', // Ideal seria receber do cliente
-        },
-        metadata: {
-          venda_id: dados.vendaId,
-          pagamento_id: pagamentoId,
-        },
+      const payment = await mercadopagoPayment.create({
+        body: {
+          transaction_amount: dados.valorPago,
+          description: `Venda ${dados.vendaId}`,
+          payment_method_id: 'pix',
+          payer: {
+            email: 'cliente@email.com', // Ideal seria receber do cliente
+          },
+          metadata: {
+            venda_id: dados.vendaId,
+            pagamento_id: pagamentoId,
+          },
+        }
       });
 
       return {
         status: 'PENDENTE',
-        transactionId: payment.body.id.toString(),
-        pixQrCode: payment.body.point_of_interaction?.transaction_data?.qr_code,
+        transactionId: payment.id?.toString(),
+        pixQrCode: payment.point_of_interaction?.transaction_data?.qr_code,
         pixQrCodeUrl:
-          payment.body.point_of_interaction?.transaction_data?.qr_code_base64,
+          payment.point_of_interaction?.transaction_data?.qr_code_base64,
         mensagem: 'PIX gerado com sucesso',
       };
     } else {
       // Processar cartão
-      const payment = await mercadopago.payment.create({
-        transaction_amount: dados.valorPago,
-        token: dados.cardToken,
-        description: `Venda ${dados.vendaId}`,
-        installments: 1,
-        payment_method_id: dados.metodoPagamento === 'CREDITO' ? 'credit_card' : 'debit_card',
-        payer: {
-          email: 'cliente@email.com',
-        },
-        metadata: {
-          venda_id: dados.vendaId,
-          pagamento_id: pagamentoId,
-        },
+      const payment = await mercadopagoPayment.create({
+        body: {
+          transaction_amount: dados.valorPago,
+          token: dados.cardToken,
+          description: `Venda ${dados.vendaId}`,
+          installments: 1,
+          payment_method_id: dados.metodoPagamento === 'CREDITO' ? 'credit_card' : 'debit_card',
+          payer: {
+            email: 'cliente@email.com',
+          },
+          metadata: {
+            venda_id: dados.vendaId,
+            pagamento_id: pagamentoId,
+          },
+        }
       });
 
       return {
-        status: payment.body.status === 'approved' ? 'APROVADO' : 'RECUSADO',
-        transactionId: payment.body.id.toString(),
-        mensagem: payment.body.status_detail || 'Pagamento processado',
+        status: payment.status === 'approved' ? 'APROVADO' : 'RECUSADO',
+        transactionId: payment.id?.toString(),
+        mensagem: payment.status_detail || 'Pagamento processado',
       };
     }
   } catch (error: any) {
@@ -306,10 +311,10 @@ export const verificarStatusPagamentoPIX = async (
     let status = pagamento.status;
 
     if (pagamento.gateway === 'MERCADOPAGO') {
-      const payment = await mercadopago.payment.get(
-        Number(pagamento.transactionId)
-      );
-      status = payment.body.status === 'approved' ? 'APROVADO' : pagamento.status;
+      const payment = await mercadopagoPayment.get({
+        id: Number(pagamento.transactionId)
+      });
+      status = payment.status === 'approved' ? 'APROVADO' : pagamento.status;
 
       if (status === 'APROVADO') {
         await prisma.pagamento.update({
