@@ -2,6 +2,12 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import CondominiosList from './pages/condominios/CondominiosList';
+import CondominioForm from './pages/condominios/CondominioForm';
+import ContainersList from './pages/containers/ContainersList';
+import ProdutosList from './pages/produtos/ProdutosList';
+import VendasList from './pages/vendas/VendasList';
+import RelatoriosPage from './pages/relatorios/RelatoriosPage';
 import AppLayout from './components/layout/AppLayout';
 
 // Componente de proteção de rota
@@ -13,20 +19,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
-}
-
-// Páginas placeholder (para não quebrar a navegação)
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">{title}</h1>
-      <div className="card">
-        <p className="text-gray-600">
-          Página em desenvolvimento. Implementação em andamento.
-        </p>
-      </div>
-    </div>
-  );
 }
 
 export default function App() {
@@ -46,29 +38,33 @@ export default function App() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
-        <Route
-          path="condominios"
-          element={<PlaceholderPage title="Condomínios" />}
-        />
-        <Route
-          path="containers"
-          element={<PlaceholderPage title="Containers" />}
-        />
-        <Route
-          path="produtos"
-          element={<PlaceholderPage title="Produtos" />}
-        />
-        <Route
-          path="vendas"
-          element={<PlaceholderPage title="Vendas" />}
-        />
-        <Route
-          path="relatorios"
-          element={<PlaceholderPage title="Relatórios" />}
-        />
+
+        {/* Condomínios */}
+        <Route path="condominios" element={<CondominiosList />} />
+        <Route path="condominios/novo" element={<CondominioForm />} />
+        <Route path="condominios/:id" element={<CondominioForm />} />
+
+        {/* Containers */}
+        <Route path="containers" element={<ContainersList />} />
+
+        {/* Produtos */}
+        <Route path="produtos" element={<ProdutosList />} />
+
+        {/* Vendas */}
+        <Route path="vendas" element={<VendasList />} />
+
+        {/* Relatórios */}
+        <Route path="relatorios" element={<RelatoriosPage />} />
+
+        {/* Configurações - Placeholder */}
         <Route
           path="configuracoes"
-          element={<PlaceholderPage title="Configurações" />}
+          element={
+            <div>
+              <h1 className="text-2xl font-bold">Configurações</h1>
+              <p className="text-gray-600 mt-2">Página em desenvolvimento</p>
+            </div>
+          }
         />
       </Route>
 
