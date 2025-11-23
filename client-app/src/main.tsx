@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import App from './App';
+import { syncService } from './services/syncService';
 import './index.css';
 
 // Registrar Service Worker (PWA)
@@ -19,6 +20,9 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+
+// Iniciar sincronização automática
+syncService.startAutoSync();
 
 const queryClient = new QueryClient({
   defaultOptions: {
