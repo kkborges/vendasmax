@@ -21,9 +21,9 @@ export class OfflineDatabase extends Dexie {
     super('VendasMaxDB');
 
     this.version(1).stores({
-      vendas: '++id, timestamp, synced',
-      produtos: 'id, categoriaId, ativo',
-      containers: 'id, condominioId, ativo',
+      vendas: '++id, timestamp', // Removido 'synced' do índice (booleano não funciona bem)
+      produtos: 'id, categoriaId',
+      containers: 'id, condominioId',
     });
   }
 }
@@ -44,7 +44,9 @@ export const offlineService = {
 
   // Obter vendas não sincronizadas
   getVendasNaoSincronizadas: async (): Promise<VendaOffline[]> => {
-    return await db.vendas.where('synced').equals(false).toArray();
+    // Usar filter em vez de where para valores booleanos
+    const todasVendas = await db.vendas.toArray();
+    return todasVendas.filter(venda => venda.synced === false);
   },
 
   // Marcar venda como sincronizada

@@ -8,6 +8,13 @@ class SyncService {
 
   // Iniciar sincronização automática
   startAutoSync() {
+    // Aguardar 5 segundos antes da primeira tentativa (dar tempo para app carregar)
+    setTimeout(() => {
+      if (navigator.onLine && !this.isSyncing) {
+        this.syncVendas();
+      }
+    }, 5000);
+
     // Tentar sincronizar a cada 30 segundos quando online
     this.syncInterval = window.setInterval(() => {
       if (navigator.onLine && !this.isSyncing) {
@@ -17,7 +24,10 @@ class SyncService {
 
     // Sincronizar quando voltar online
     window.addEventListener('online', () => {
-      this.syncVendas();
+      // Aguardar 1 segundo após voltar online antes de tentar
+      setTimeout(() => {
+        this.syncVendas();
+      }, 1000);
     });
   }
 
@@ -45,7 +55,7 @@ class SyncService {
         return;
       }
 
-      console.log(`Sincronizando ${vendasPendentes.length} vendas pendentes...`);
+      console.log(`🔄 Sincronizando ${vendasPendentes.length} venda(s) pendente(s)...`);
 
       let sucessos = 0;
       let falhas = 0;
@@ -63,20 +73,25 @@ class SyncService {
 
           sucessos++;
         } catch (error) {
-          console.error('Erro ao sincronizar venda:', error);
+          console.error('❌ Erro ao sincronizar venda:', error);
           falhas++;
         }
       }
 
       if (sucessos > 0) {
+        console.log(`✅ ${sucessos} venda(s) sincronizada(s) com sucesso!`);
         toast.success(`${sucessos} venda(s) sincronizada(s) com sucesso!`);
       }
 
       if (falhas > 0) {
+        console.warn(`⚠️ ${falhas} venda(s) falharam ao sincronizar.`);
         toast.error(`${falhas} venda(s) falharam ao sincronizar. Tentaremos novamente.`);
       }
     } catch (error) {
-      console.error('Erro ao sincronizar vendas:', error);
+      // Não logar erro se for só porque não há vendas pendentes
+      if (error instanceof Error && !error.message.includes('no such table')) {
+        console.error('❌ Erro ao sincronizar vendas:', error);
+      }
     } finally {
       this.isSyncing = false;
     }
