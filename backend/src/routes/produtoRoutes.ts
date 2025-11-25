@@ -8,8 +8,9 @@ router.use(authMiddleware);
 
 // Rotas de produtos
 router.get('/', produtoController.listarProdutos);
-router.get('/:id', produtoController.buscarProduto);
+router.get('/container/:containerId', produtoController.listarProdutosPorContainer);
 router.get('/codigo/:codigo', produtoController.buscarPorCodigoBarras);
+router.get('/:id', produtoController.buscarProduto);
 
 // Rotas que modificam dados requerem permissão
 router.post('/', operadorOrAdmin, produtoController.criarProduto);

@@ -99,7 +99,58 @@ export const buscarPorCodigoBarras = async (req: Request, res: Response) => {
       throw new AppError('Produto não encontrado', 404);
     }
 
-    res.json(produto);
+    // Adicionar alias preco para compatibilidade com client-app
+    const produtoComPreco = {
+      ...produto,
+      preco: produto.valorVenda,
+    };
+
+    res.json(produtoComPreco);
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const listarProdutosPorContainer = async (req: Request, res: Response) => {
+  try {
+    const { containerId } = req.params;
+
+    // Verificar se container existe
+    const container = await prisma.container.findUnique({
+      where: { id: containerId },
+    });
+
+    if (!container) {
+      throw new AppError('Container não encontrado', 404);
+    }
+
+    // Buscar produtos com estoque neste container
+    const produtos = await prisma.produto.findMany({
+      where: { ativo: true },
+      include: {
+        categoria: true,
+        estoqueGeral: true,
+        estoqueContainers: {
+          where: { containerId },
+        },
+      },
+      orderBy: { nome: 'asc' },
+    });
+
+    // Mapear produtos com quantidade disponível no container
+    const produtosComEstoque = produtos.map((produto) => ({
+      ...produto,
+      preco: produto.valorVenda, // Alias para compatibilidade com client-app
+      quantidadeDisponivel: produto.estoqueContainers[0]?.quantidade || 0,
+      containerEstoque: produto.estoqueContainers,
+    }));
+
+    // Filtrar apenas produtos com estoque > 0 no container
+    const produtosDisponiveis = produtosComEstoque.filter(
+      (p) => p.quantidadeDisponivel > 0
+    );
+
+    res.json(produtosDisponiveis);
   } catch (error) {
     throw error;
   }

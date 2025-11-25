@@ -39,11 +39,14 @@ export default function Products() {
     queryKey: ['produtos', selectedContainer?.id],
     queryFn: () => produtosService.listByContainer(selectedContainer!.id),
     enabled: !!selectedContainer && isOnline,
-    onSuccess: async (data) => {
-      // Salvar no cache para uso offline
-      await offlineService.salvarProdutos(data);
-    },
   });
+
+  // Salvar produtos no cache quando obtidos online
+  useEffect(() => {
+    if (onlineProdutos && isOnline) {
+      offlineService.salvarProdutos(onlineProdutos);
+    }
+  }, [onlineProdutos, isOnline]);
 
   // Carregar produtos do cache quando offline
   useEffect(() => {

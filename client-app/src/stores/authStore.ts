@@ -20,7 +20,7 @@ interface AuthStore {
   token: string | null;
   isAuthenticated: boolean;
   login: (usuario: string, senha: string) => Promise<void>;
-  selectContainer: (container: Container) => void;
+  setSelectedContainer: (container: Container) => void;
   logout: () => void;
 }
 
@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthStore>()(
         });
       },
 
-      selectContainer: (container: Container) => {
+      setSelectedContainer: (container: Container) => {
         set({ selectedContainer: container });
       },
 

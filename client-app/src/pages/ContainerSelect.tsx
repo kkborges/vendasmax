@@ -23,11 +23,14 @@ export default function ContainerSelect() {
     queryKey: ['containers', condominio?.id],
     queryFn: () => containersService.listByCondominio(condominio!.id),
     enabled: !!condominio && isOnline,
-    onSuccess: async (data) => {
-      // Salvar no cache para uso offline
-      await offlineService.salvarContainers(data);
-    },
   });
+
+  // Salvar containers no cache quando obtidos online
+  useEffect(() => {
+    if (onlineContainers && isOnline) {
+      offlineService.salvarContainers(onlineContainers);
+    }
+  }, [onlineContainers, isOnline]);
 
   // Carregar containers do cache quando offline
   useEffect(() => {

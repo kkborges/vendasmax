@@ -37,7 +37,7 @@ export const produtosService = {
   },
 
   getByCode: async (code: string): Promise<Produto> => {
-    const response = await api.get(`/produtos/code/${code}`);
+    const response = await api.get(`/produtos/codigo/${code}`);
     return response.data;
   },
 

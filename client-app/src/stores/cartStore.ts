@@ -5,7 +5,7 @@ export interface CartItem {
   produtoId: string;
   nome: string;
   quantidade: number;
-  valorUnitario: number;
+  preco: number;
   foto?: string;
 }
 
@@ -14,8 +14,8 @@ interface CartStore {
   addItem: (item: CartItem) => void;
   removeItem: (produtoId: string) => void;
   updateQuantity: (produtoId: string, quantidade: number) => void;
-  clear: () => void;
-  total: () => number;
+  clearCart: () => void;
+  getTotal: () => number;
   itemCount: () => number;
 }
 
@@ -51,11 +51,11 @@ export const useCartStore = create<CartStore>()(
           ),
         })),
 
-      clear: () => set({ items: [] }),
+      clearCart: () => set({ items: [] }),
 
-      total: () => {
+      getTotal: () => {
         const { items } = get();
-        return items.reduce((sum, item) => sum + item.valorUnitario * item.quantidade, 0);
+        return items.reduce((sum, item) => sum + item.preco * item.quantidade, 0);
       },
 
       itemCount: () => {
